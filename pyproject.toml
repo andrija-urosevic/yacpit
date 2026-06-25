@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yacpit"
+version = "0.1.0"
+description = "Yet Another Competitive Programming Interface Tool"
+requires-python = ">=3.8"
+
+[project.scripts]
+yacpit = "yacpit:main"   # if main() lives in yacpit/__init__.py
+# or: yacpit = "yacpit.cli:main" if in yacpit/cli.py
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"yacpit" = ["static/github-markdown.css"]

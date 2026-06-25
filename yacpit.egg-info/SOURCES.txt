@@ -1,0 +1,13 @@
+LICENSE
+MANIFEST.in
+README.md
+pyproject.toml
+yacpit/__init__.py
+yacpit.egg-info/PKG-INFO
+yacpit.egg-info/SOURCES.txt
+yacpit.egg-info/dependency_links.txt
+yacpit.egg-info/entry_points.txt
+yacpit.egg-info/top_level.txt
+yacpit/static/github-markdown.css
+yacpit/static/tester.py
+yacpit/static/tex-mml-chtml.js
