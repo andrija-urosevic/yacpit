@@ -43,6 +43,7 @@ class ProblemMeta:
     language: str
     sources: List[Path]
     headers: List[Path]
+    templates: List[Path]
 
 class TestResult(Enum):
     OK = "OK"
@@ -136,6 +137,7 @@ def get_problem_meta(task_dir: Path, solution_dir: Path | None = None) -> Proble
     memory_limit: int = DEFAULT_MEMORY_LIMIT 
     sources: List[Path] = []
     headers: List[Path] = []
+    templates: List[Path] = []
     language: str = "c"
 
     with md_file.open("r", encoding="utf-8") as f:
@@ -172,6 +174,9 @@ def get_problem_meta(task_dir: Path, solution_dir: Path | None = None) -> Proble
                         headers = [solution_dir / hdr.strip() for hdr in hdrs_str.split(",") if hdr.strip()]
                     else:
                         headers = [task_dir / hdr.strip() for hdr in hdrs_str.split(",") if hdr.strip()]
+                elif line.startswith("templates:"):
+                    tmpls_str = line.split(":", 1)[1].strip().lstrip("[").rstrip("]")
+                    templates = [task_dir / tmpl.strip() for tmpl in tmpls_str.split(",") if tmpl.strip()]
                 elif line.startswith("language:") or line.startswith("lang:"):
                     lang_val = line.split(":", 1)[1].strip().lower()
                     if lang_val in ("c", "cpp"):
@@ -187,7 +192,8 @@ def get_problem_meta(task_dir: Path, solution_dir: Path | None = None) -> Proble
         memory_limit_mb=memory_limit,
         language=language,
         sources=sources,
-        headers=headers
+        headers=headers,
+        templates=templates
     )
 
 def compile_cpp(problem: ProblemMeta, task_dir: Path) -> Path | None:
@@ -398,6 +404,7 @@ def init_task(args):
             f'language: {DEFAULT_LANGUAGE}\n'
             f'sources: [ main.c ]\n'
             f'headers: [ ]\n'
+            f'templates: [ ]\n'
             f'author: {get_user()}\n'
             f'---\n'
             f'\n'
@@ -836,7 +843,17 @@ def append_solution_section(md_text: str, problem_meta: ProblemMeta, task_dir: P
     return md_text + solution_section
 
 
-def generate_html_for_task(task_dir: Path, output_dir: Path):
+def append_templates_section(md_text: str, problem_meta: ProblemMeta, task_dir: Path) -> str:
+    templates_section = "\n\n## Postavka\n\n"
+    for template in problem_meta.templates:
+        if template.exists():
+            template_text = template.read_text(encoding="utf-8")
+            templates_section += f"### `{template.name}`\n\n"
+            templates_section += f"```{problem_meta.language}\n{template_text}\n```\n\n"
+    return md_text + templates_section
+
+
+def generate_html_for_task(task_dir: Path, output_dir: Path, show_templates: bool = False, show_solutions: bool = False):
     problem_meta: ProblemMeta = get_problem_meta(task_dir)
     if problem_meta is None:
         print(f'Error: could not read problem metadata for task {task_dir.name}.', file=sys.stderr)
@@ -856,7 +873,10 @@ def generate_html_for_task(task_dir: Path, output_dir: Path):
 
     md_text = md_file.read_text(encoding="utf-8")
     md_text = trim_markdown_meta(md_text)
-    md_text = append_solution_section(md_text, problem_meta, task_dir)
+    if show_templates:
+        md_text = append_templates_section(md_text, problem_meta, task_dir)
+    if show_solutions:
+        md_text = append_solution_section(md_text, problem_meta, task_dir)
     title = problem_meta.pname or md_file.stem
     success = render_and_write_html(title, md_text, html_file)
     if not success:
@@ -879,7 +899,7 @@ def html_task(args):
         output_dir.mkdir(parents=True, exist_ok=True)
         return
 
-    generate_html_for_task(task_dir, Path(args.output))
+    generate_html_for_task(task_dir, Path(args.output), show_templates=args.templates, show_solutions=args.solutions)
 
 def get_github_markdown_css(args):
     css_text = get_github_markdown_css_text()
@@ -933,7 +953,7 @@ def html_all(args):
 
     for task_dir in sorted(task_dirs, key=lambda p: p.name):
         print(f'Generating HTML for {task_dir.name}...')
-        generate_html_for_task(task_dir, Path(args.output))
+        generate_html_for_task(task_dir, Path(args.output), show_templates=args.templates, show_solutions=args.solutions)
 
 def make_exam(args):
     title: str = args.exam_name
@@ -1284,10 +1304,14 @@ def build_parser() -> argparse.ArgumentParser:
     html_task_p = sub_p.add_parser("html-task", help="Generate HTML for the given task")
     html_task_p.add_argument("task_num", type=str, help="task number")
     html_task_p.add_argument("-o", "--output", type=str, default=CURRENT_DIR, help="output directory")
+    html_task_p.add_argument("-t", "--templates", action="store_true", help="include templates section in generated HTML")
+    html_task_p.add_argument("-s", "--solutions", action="store_true", help="include solutions section in generated HTML")
     html_task_p.set_defaults(func=html_task)
 
     html_all_p = sub_p.add_parser("html-all", help="Generate HTML for all tasks")
     html_all_p.add_argument("-o", "--output", type=str, default=CURRENT_DIR, help="output directory")
+    html_all_p.add_argument("-t", "--templates", action="store_true", help="include templates section in generated HTML")
+    html_all_p.add_argument("-s", "--solutions", action="store_true", help="include solutions section in generated HTML")
     html_all_p.set_defaults(func=html_all)
 
     get_css_p = sub_p.add_parser("get-github-css", help="Get GitHub markdown CSS")
