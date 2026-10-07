@@ -16,6 +16,7 @@ DEFAULT_EXAM_TEMPLATE_COURSE = "KiAA_"
 CURRENT_DIR = "."
 BUILD_DIR = "_build"
 TEST_DIR = "tests"
+TEMPLATE_DIR = "templates"
 VERSION = "0.0.1"
 PACKAGE_ROOT = Path(__file__).resolve().parent
 STATIC_DIR = PACKAGE_ROOT / "static"
@@ -43,7 +44,6 @@ class ProblemMeta:
     language: str
     sources: List[Path]
     headers: List[Path]
-    templates: List[Path]
 
 class TestResult(Enum):
     OK = "OK"
@@ -137,7 +137,6 @@ def get_problem_meta(task_dir: Path, solution_dir: Path | None = None) -> Proble
     memory_limit: int = DEFAULT_MEMORY_LIMIT 
     sources: List[Path] = []
     headers: List[Path] = []
-    templates: List[Path] = []
     language: str = "c"
 
     with md_file.open("r", encoding="utf-8") as f:
@@ -174,9 +173,6 @@ def get_problem_meta(task_dir: Path, solution_dir: Path | None = None) -> Proble
                         headers = [solution_dir / hdr.strip() for hdr in hdrs_str.split(",") if hdr.strip()]
                     else:
                         headers = [task_dir / hdr.strip() for hdr in hdrs_str.split(",") if hdr.strip()]
-                elif line.startswith("templates:"):
-                    tmpls_str = line.split(":", 1)[1].strip().lstrip("[").rstrip("]")
-                    templates = [task_dir / tmpl.strip() for tmpl in tmpls_str.split(",") if tmpl.strip()]
                 elif line.startswith("language:") or line.startswith("lang:"):
                     lang_val = line.split(":", 1)[1].strip().lower()
                     if lang_val in ("c", "cpp"):
@@ -192,8 +188,7 @@ def get_problem_meta(task_dir: Path, solution_dir: Path | None = None) -> Proble
         memory_limit_mb=memory_limit,
         language=language,
         sources=sources,
-        headers=headers,
-        templates=templates
+        headers=headers
     )
 
 def compile_cpp(problem: ProblemMeta, task_dir: Path) -> Path | None:
@@ -362,15 +357,25 @@ def init_task(args):
     except Exception as e:
         print(f'Error: {path}: {e}', file=sys.stderr)
 
-    path_tests = path / "tests"
+    path_tests = path / TEST_DIR
     try:
         path_tests.mkdir()
         if args.verbose:
             print(f'New directory created on {path_tests}')
     except FileExistsError:
         print(f'Error: {path_tests} already exists', file=sys.stderr)
+    except Exception as e:
         print(f'Error: {path_tests}: {e}', file=sys.stderr)
-        print(f'Error: {path_test}: {e}', file=sys.stderr)
+
+    path_templates = path / TEMPLATE_DIR
+    try:
+        path_templates.mkdir()
+        if args.verbose:
+            print(f'New directory created on {path_templates}')
+    except FileExistsError:
+        print(f'Error: {path_templates} already exists', file=sys.stderr)
+    except Exception as e:
+        print(f'Error: {path_templates}: {e}', file=sys.stderr)
 
     path_main = path / "main.c"
     try:
@@ -404,7 +409,6 @@ def init_task(args):
             f'language: {DEFAULT_LANGUAGE}\n'
             f'sources: [ main.c ]\n'
             f'headers: [ ]\n'
-            f'templates: [ ]\n'
             f'author: {get_user()}\n'
             f'---\n'
             f'\n'
@@ -844,12 +848,20 @@ def append_solution_section(md_text: str, problem_meta: ProblemMeta, task_dir: P
 
 
 def append_templates_section(md_text: str, problem_meta: ProblemMeta, task_dir: Path) -> str:
+    templates_dir = task_dir / TEMPLATE_DIR
+    if not templates_dir.is_dir():
+        return md_text
+
+    templates = [templates_dir / code.name for code in problem_meta.headers + problem_meta.sources]
+    templates = [t for t in templates if t.exists()]
+    if not templates:
+        return md_text
+
     templates_section = "\n\n## Postavka\n\n"
-    for template in problem_meta.templates:
-        if template.exists():
-            template_text = template.read_text(encoding="utf-8")
-            templates_section += f"### `{template.name}`\n\n"
-            templates_section += f"```{problem_meta.language}\n{template_text}\n```\n\n"
+    for template in templates:
+        template_text = template.read_text(encoding="utf-8")
+        templates_section += f"### `{template.name}`\n\n"
+        templates_section += f"```{problem_meta.language}\n{template_text}\n```\n\n"
     return md_text + templates_section
 
 
@@ -1036,10 +1048,16 @@ def make_exam(args):
         problem_meta: ProblemMeta = get_problem_meta(task_dir)
         if problem_meta is None:
             continue
+        templates_dir = task_dir / TEMPLATE_DIR
         for src in problem_meta.sources:
             student_src = student_task_dir / src.name
-            if not student_src.exists():
-                student_src.touch()
+            if student_src.exists():
+                continue
+            template_src = templates_dir / src.name
+            if template_src.exists():
+                shutil.copy2(template_src, student_src)
+            else:
+                shutil.copy2(src, student_src)
     print(f'Solution templates created in {solutions_dir}!')
 
     statements_dir = output_dir / "statements"
