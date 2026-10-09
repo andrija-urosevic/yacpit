@@ -666,6 +666,45 @@ def build_github_preview_html(title: str, body_fragment: str) -> str:
 			background: #ffffff;
 		}}
 
+		.code-copy-container {{
+			position: relative;
+		}}
+
+		.copy-code-btn {{
+			position: absolute;
+			top: 6px;
+			right: 6px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			width: 28px;
+			height: 28px;
+			padding: 0;
+			border-radius: 6px;
+			border: 1px solid #d0d7de;
+			background: #ffffff;
+			color: #24292f;
+			cursor: pointer;
+			opacity: 0.85;
+			transition: background-color 0.15s ease, opacity 0.15s ease;
+		}}
+
+		.copy-code-btn svg {{
+			display: block;
+		}}
+
+		.copy-code-btn:hover {{
+			background: #f3f4f6;
+			opacity: 1;
+		}}
+
+		.copy-code-btn.copied {{
+			background: #2da44e;
+			border-color: #2da44e;
+			color: #ffffff;
+			opacity: 1;
+		}}
+
 		@media (prefers-color-scheme: dark) {{
 			body {{
 				background-color: #0d1117;
@@ -680,6 +719,19 @@ def build_github_preview_html(title: str, body_fragment: str) -> str:
 			}}
 			details.solution-section[open] {{
 				background: #0d1117;
+			}}
+			.copy-code-btn {{
+				border-color: #30363d;
+				background: #21262d;
+				color: #c9d1d9;
+			}}
+			.copy-code-btn:hover {{
+				background: #30363d;
+			}}
+			.copy-code-btn.copied {{
+				background: #238636;
+				border-color: #2ea043;
+				color: #ffffff;
 			}}
 		}}
     </style>
@@ -731,6 +783,59 @@ def build_github_preview_html(title: str, body_fragment: str) -> str:
           }}
 
           heading.replaceWith(details);
+        }});
+      }});
+    </script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {{
+        const copyIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"></path><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"></path></svg>';
+        const checkIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"></path></svg>';
+
+        document.querySelectorAll('.markdown-body pre').forEach((preEl) => {{
+          const container = preEl.closest('.highlight') || preEl;
+          container.classList.add('code-copy-container');
+
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'copy-code-btn';
+          button.innerHTML = copyIconSvg;
+          button.setAttribute('aria-label', 'Copy code');
+          button.title = 'Copy';
+          button.addEventListener('click', () => {{
+            const codeText = preEl.textContent.replace(/\\n$/, '');
+
+            const fallbackCopy = () => {{
+              const textarea = document.createElement('textarea');
+              textarea.value = codeText;
+              textarea.style.position = 'fixed';
+              textarea.style.opacity = '0';
+              document.body.appendChild(textarea);
+              textarea.select();
+              try {{
+                document.execCommand('copy');
+              }} catch (err) {{
+                // ignore
+              }}
+              document.body.removeChild(textarea);
+            }};
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {{
+              navigator.clipboard.writeText(codeText).catch(fallbackCopy);
+            }} else {{
+              fallbackCopy();
+            }}
+
+            button.innerHTML = checkIconSvg;
+            button.title = 'Copied!';
+            button.classList.add('copied');
+            setTimeout(() => {{
+              button.innerHTML = copyIconSvg;
+              button.title = 'Copy';
+              button.classList.remove('copied');
+            }}, 1500);
+          }});
+
+          container.appendChild(button);
         }});
       }});
     </script>
